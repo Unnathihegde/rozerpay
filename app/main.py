@@ -48,6 +48,46 @@ class PayRequest(BaseModel):
     amount_paise: int | None = None
 
 
+class ProductCreate(BaseModel):
+    name: str
+    category: str
+    price_paise: int
+    stock_qty: int = Field(ge=0)
+    attributes: dict = Field(default_factory=dict)
+
+
+@app.post("/v1/products")
+def create_product(request: ProductCreate, db: Session = Depends(get_db)) -> dict:
+    """Create a new product in the catalog backed by the real database.
+
+    An embedding is generated automatically and attributes are stored as JSON.
+    """
+    import uuid as _uuid
+    import json as _json
+    import numpy as _np
+
+    rng = _np.random.default_rng()
+    product = Product(
+        id=str(_uuid.uuid4()),
+        name=request.name,
+        category=request.category,
+        price_paise=request.price_paise,
+        stock_qty=request.stock_qty,
+        attributes_json=_json.dumps(request.attributes),
+        embedding_json=_json.dumps(rng.random(8).tolist()),
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return {
+        "id": product.id,
+        "name": product.name,
+        "category": product.category,
+        "price_paise": product.price_paise,
+        "stock_qty": product.stock_qty,
+    }
+
+
 @app.get("/catalog.jsonld")
 def catalog_jsonld(db: Session = Depends(get_db)) -> JSONResponse:
     products = list(db.scalars(select(Product).order_by(Product.price_paise)))
@@ -205,6 +245,8 @@ def audit(order_id: str, db: Session = Depends(get_db)) -> dict:
 
 @app.get("/v1/approvals")
 def pending_approvals(db: Session = Depends(get_db)) -> dict:
+    from datetime import datetime, timezone
+
     approvals = list(
         db.scalars(
             select(ApprovalRequest)
@@ -212,19 +254,31 @@ def pending_approvals(db: Session = Depends(get_db)) -> dict:
             .order_by(ApprovalRequest.created_at)
         )
     )
-    return {
-        "items": [
+    items = []
+    for approval in approvals:
+        created = approval.created_at
+        if isinstance(created, datetime):
+            created_ts = created.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        elif isinstance(created, str):
+            if created.endswith("+00:00"):
+                created_ts = created.replace("+00:00", "Z").replace(" ", "T")
+            elif " " in created and "T" not in created:
+                created_ts = created.replace(" ", "T") + "Z"
+            else:
+                created_ts = created
+        else:
+            created_ts = str(created)
+
+        items.append(
             {
                 "approval_id": approval.id,
                 "order_id": approval.order_id,
                 "amount_paise": approval.amount_paise,
                 "status": approval.status,
-                "created_at": approval.created_at,
+                "created_at": created_ts,
             }
-            for approval in approvals
-        ],
-        "count": len(approvals),
-    }
+        )
+    return {"items": items, "count": len(approvals)}
 
 
 @app.post("/v1/approvals/{approval_id}/approve")

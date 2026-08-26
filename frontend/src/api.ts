@@ -95,3 +95,6 @@ export const approveRequest = async (approval_id: string): Promise<Approval> =>
   (await client.post<Approval>(`/v1/approvals/${approval_id}/approve`)).data;
 export const rejectRequest = async (approval_id: string): Promise<Approval> =>
   (await client.post<Approval>(`/v1/approvals/${approval_id}/reject`)).data;
+
+export const createProduct = async (payload: { name: string; category: string; price_paise: number; stock_qty: number; attributes?: Record<string, unknown> }) =>
+  (await client.post<string>("/v1/products", payload)).data;
