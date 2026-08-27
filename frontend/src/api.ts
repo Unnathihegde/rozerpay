@@ -8,6 +8,8 @@ export type Product = {
   stock_qty: number;
 };
 
+export type CreatedProduct = Product;
+
 export type CatalogProduct = {
   "@type": "Product";
   "@id": string;
@@ -96,5 +98,5 @@ export const approveRequest = async (approval_id: string): Promise<Approval> =>
 export const rejectRequest = async (approval_id: string): Promise<Approval> =>
   (await client.post<Approval>(`/v1/approvals/${approval_id}/reject`)).data;
 
-export const createProduct = async (payload: { name: string; category: string; price_paise: number; stock_qty: number; attributes?: Record<string, unknown> }) =>
-  (await client.post<string>("/v1/products", payload)).data;
+export const createProduct = async (payload: { name: string; category: string; price_paise: number; stock_qty: number; attributes?: Record<string, unknown> }): Promise<CreatedProduct> =>
+  (await client.post<CreatedProduct>("/v1/products", payload)).data;
