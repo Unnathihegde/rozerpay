@@ -1,11 +1,13 @@
 from decimal import Decimal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import Base, engine, get_db
 from app.gateway.catalog import suggest_upsell
 from app.gateway.checkout import create_payment_link, initiate_checkout
@@ -17,6 +19,13 @@ from app.models import ApprovalRequest, LedgerEntry, Order, Product, Quote
 
 
 app = FastAPI(title="Merchant Agent Gateway")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 Base.metadata.create_all(bind=engine)
 
@@ -238,6 +247,152 @@ def reject(approval_id: str, db: Session = Depends(get_db)) -> dict:
     except RuntimeError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     return {"approval_id": approval.id, "status": approval.status}
+
+
+def _serialize_order(order: Order, product: Product | None, quote: Quote | None) -> dict:
+    return {
+        "order_id": order.id,
+        "quote_id": order.quote_id,
+        "product_id": quote.product_id if quote is not None else None,
+        "product_name": product.name if product is not None else None,
+        "category": product.category if product is not None else None,
+        "quantity": quote.quantity if quote is not None else None,
+        "amount_paise": order.amount_paise,
+        "currency": order.currency,
+        "status": order.status,
+        "source": "agent" if order.is_autonomous else "storefront",
+        "is_autonomous": order.is_autonomous,
+        "razorpay_order_id": order.razorpay_order_id,
+        "razorpay_payment_link_url": order.razorpay_payment_link_url,
+        "created_at": order.created_at,
+        "updated_at": order.updated_at,
+    }
+
+
+@app.get("/v1/orders")
+def list_orders(db: Session = Depends(get_db)) -> dict:
+    orders = list(db.scalars(select(Order).order_by(Order.created_at.desc())))
+    quote_ids = {order.quote_id for order in orders}
+    quotes = {q.id: q for q in db.scalars(select(Quote).where(Quote.id.in_(quote_ids)))} if quote_ids else {}
+    product_ids = {q.product_id for q in quotes.values()}
+    products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_(product_ids)))} if product_ids else {}
+    items = []
+    for order in orders:
+        quote = quotes.get(order.quote_id)
+        product = products.get(quote.product_id) if quote is not None else None
+        items.append(_serialize_order(order, product, quote))
+    return {"items": items, "count": len(items)}
+
+
+@app.get("/v1/inventory")
+def list_inventory(db: Session = Depends(get_db)) -> dict:
+    products = list(db.scalars(select(Product).order_by(Product.category, Product.name)))
+    items = [
+        {
+            "product_id": product.id,
+            "name": product.name,
+            "category": product.category,
+            "price_paise": product.price_paise,
+            "stock_qty": product.stock_qty,
+            "attributes": product.attributes,
+        }
+        for product in products
+    ]
+    return {"items": items, "count": len(items)}
+
+
+@app.get("/v1/ledger")
+def list_ledger(limit: int = 100, db: Session = Depends(get_db)) -> dict:
+    limit = max(1, min(limit, 500))
+    entries = list(
+        db.query(LedgerEntry).order_by(LedgerEntry.id.desc()).limit(limit)
+    )
+    items = [
+        {
+            "id": entry.id,
+            "order_id": entry.order_id,
+            "step": entry.step,
+            "timestamp": entry.timestamp,
+            "details": entry.details,
+        }
+        for entry in entries
+    ]
+    return {"items": items, "count": len(items)}
+
+
+@app.get("/v1/metrics")
+def metrics(db: Session = Depends(get_db)) -> dict:
+    total_orders = db.scalar(select(func.count()).select_from(Order)) or 0
+    paid_orders = (
+        db.scalar(select(func.count()).select_from(Order).where(Order.status == "paid")) or 0
+    )
+    autonomous_orders = (
+        db.scalar(select(func.count()).select_from(Order).where(Order.is_autonomous.is_(True))) or 0
+    )
+    gmv_paise = db.scalar(select(func.coalesce(func.sum(Order.amount_paise), 0))) or 0
+    settled_paise = (
+        db.scalar(
+            select(func.coalesce(func.sum(Order.amount_paise), 0)).where(Order.status == "paid")
+        )
+        or 0
+    )
+    pending_approvals = (
+        db.scalar(
+            select(func.count())
+            .select_from(ApprovalRequest)
+            .where(ApprovalRequest.status == "pending")
+        )
+        or 0
+    )
+    total_stock = db.scalar(select(func.coalesce(func.sum(Product.stock_qty), 0))) or 0
+    product_count = db.scalar(select(func.count()).select_from(Product)) or 0
+    out_of_stock = (
+        db.scalar(select(func.count()).select_from(Product).where(Product.stock_qty == 0)) or 0
+    )
+
+    status_rows = db.execute(
+        select(Order.status, func.count()).group_by(Order.status)
+    ).all()
+    status_breakdown = {status: count for status, count in status_rows}
+
+    return {
+        "total_orders": total_orders,
+        "paid_orders": paid_orders,
+        "autonomous_orders": autonomous_orders,
+        "storefront_orders": total_orders - autonomous_orders,
+        "gmv_paise": int(gmv_paise),
+        "settled_paise": int(settled_paise),
+        "pending_approvals": pending_approvals,
+        "product_count": product_count,
+        "total_stock": int(total_stock),
+        "out_of_stock": out_of_stock,
+        "status_breakdown": status_breakdown,
+        "spend_limit_paise": settings.spend_limit_paise,
+    }
+
+
+@app.get("/v1/status")
+def system_status(db: Session = Depends(get_db)) -> dict:
+    razorpay_configured = not settings.razorpay_key_id.startswith("rzp_test_xxxx")
+    webhook_configured = not settings.razorpay_webhook_secret.startswith("whsec_xxxx")
+    last_entry = db.query(LedgerEntry).order_by(LedgerEntry.id.desc()).first()
+    return {
+        "services": [
+            {"name": "Gateway API", "status": "operational"},
+            {"name": "Ledger", "status": "operational"},
+            {
+                "name": "Razorpay Keys",
+                "status": "operational" if razorpay_configured else "test_mode",
+            },
+            {
+                "name": "Webhook Signing",
+                "status": "operational" if webhook_configured else "test_mode",
+            },
+        ],
+        "spend_limit_paise": settings.spend_limit_paise,
+        "quote_signing": "enabled",
+        "last_event_at": last_entry.timestamp if last_entry is not None else None,
+    }
 
 
 @app.post("/api/v1/webhook/razorpay")
