@@ -36,6 +36,10 @@ def search_catalog(constraints: dict) -> dict:
 @mcp.tool()
 def get_quote(product_id: str, quantity: int) -> dict:
     """Create a signed, time-limited quote."""
+    if not product_id:
+        raise ValueError("product_id is required")
+    if quantity < 1:
+        raise ValueError("quantity must be at least 1")
     db = SessionLocal()
     try:
         quote = create_quote(db, product_id, quantity)
@@ -71,6 +75,10 @@ def apply_discount_or_upsell(quote_id: str) -> dict | None:
 @mcp.tool(name="initiate_checkout")
 def initiate_checkout_tool(quote_id: str, nonce: str) -> dict:
     """Begin x402 payment negotiation for a quote."""
+    if not quote_id:
+        raise ValueError("quote_id is required")
+    if not nonce:
+        raise ValueError("nonce is required")
     db = SessionLocal()
     try:
         order = initiate_checkout(db, quote_id, nonce)

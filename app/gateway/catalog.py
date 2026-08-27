@@ -55,7 +55,9 @@ UPSELL_RULES = {
 
 
 def suggest_upsell(product: Product) -> dict | None:
-    rule = UPSELL_RULES[product.category]
+    rule = UPSELL_RULES.get(product.category)
+    if rule is None:
+        return None
     if rule["add"] is None:
         return None
     return {

@@ -22,13 +22,20 @@ def verify_webhook_signature(payload: bytes, received_signature: str | None) -> 
 
 def process_webhook(db: Session, payload: bytes) -> None:
     event = json.loads(payload)
+    if not isinstance(event, dict):
+        raise ValueError("invalid webhook payload")
+    event_name = event.get("event")
+    if event_name not in {"payment.captured", "payment.failed"}:
+        raise ValueError("unsupported webhook event")
     entity = event.get("payload", {}).get("payment", {}).get("entity", {})
+    if not isinstance(entity, dict) or not entity.get("order_id"):
+        raise ValueError("webhook payment order_id is required")
     razorpay_order_id = entity.get("order_id")
     order = db.query(Order).filter(Order.razorpay_order_id == razorpay_order_id).one_or_none()
     if order is None:
         return
 
-    if event.get("event") == "payment.captured":
+    if event_name == "payment.captured":
         quote = db.get(Quote, order.quote_id)
         product = db.get(Product, quote.product_id) if quote else None
         if quote and product and order.status != "paid":
@@ -40,7 +47,7 @@ def process_webhook(db: Session, payload: bytes) -> None:
             db.commit()
         return
 
-    if event.get("event") == "payment.failed":
+    if event_name == "payment.failed":
         if order.status == "recovered_pending_retry":
             return
         quote = db.get(Quote, order.quote_id)

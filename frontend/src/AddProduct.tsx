@@ -10,16 +10,18 @@ export default function AddProduct() {
   const [stock, setStock] = useState(1);
   const [attributes, setAttributes] = useState("{}");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       let parsedAttrs: Record<string, unknown> = {};
       try {
         parsedAttrs = attributes ? JSON.parse(attributes) : {};
-      } catch (err) {
-        alert("Attributes must be valid JSON");
+      } catch {
+        setError("Attributes must be valid JSON.");
         setLoading(false);
         return;
       }
@@ -33,10 +35,8 @@ export default function AddProduct() {
       await createProduct(payload);
       alert("Product created successfully. Refreshing catalog...");
       window.location.reload();
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err);
-      alert("Failed to create product");
+    } catch {
+      setError("Product could not be created. Check the connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -44,27 +44,27 @@ export default function AddProduct() {
 
   if (!open) {
     return (
-      <div style={{ display: "inline-block", marginLeft: 12 }}>
+      <div className="add-product-trigger">
         <button className="gateway-add-product" onClick={() => setOpen(true)}>Add Product</button>
       </div>
     );
   }
 
   return (
-    <div className="add-product-form" style={{ padding: 12, background: "#fff", borderRadius: 8, marginLeft: 12 }}>
+    <div className="add-product-form">
+      <div className="add-product-heading"><div><span className="add-product-kicker">Catalog</span><h2>Add product</h2></div><button type="button" className="add-product-close" onClick={() => setOpen(false)} aria-label="Close add product form">×</button></div>
       <form onSubmit={submit}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} required />
-          <input type="number" step="0.01" placeholder="Price (₹)" value={price} onChange={(e) => setPrice(Number(e.target.value))} required />
-          <input type="number" placeholder="Stock" value={stock} onChange={(e) => setStock(Number(e.target.value))} required />
+        <div className="add-product-fields">
+          <label>Product name<input placeholder="e.g. USB-C cable" value={name} onChange={(e) => setName(e.target.value)} required /></label>
+          <label>Category<input placeholder="e.g. accessory" value={category} onChange={(e) => setCategory(e.target.value)} required /></label>
+          <label>Price (INR)<input type="number" min="0.01" step="0.01" placeholder="0.00" value={price || ""} onChange={(e) => setPrice(Number(e.target.value))} required /></label>
+          <label>Stock quantity<input type="number" min="0" step="1" placeholder="0" value={stock} onChange={(e) => setStock(Number(e.target.value))} required /></label>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <textarea rows={3} placeholder='Attributes (JSON), e.g. {"compatibility":"USB-C"}' value={attributes} onChange={(e) => setAttributes(e.target.value)} />
-        </div>
-        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-          <button type="submit" disabled={loading}>Create</button>
-          <button type="button" onClick={() => setOpen(false)}>Cancel</button>
+        <label className="add-product-attributes">Attributes <span>Optional JSON metadata</span><textarea rows={4} placeholder='{"compatibility":"USB-C"}' value={attributes} onChange={(e) => setAttributes(e.target.value)} /></label>
+        {error && <p className="add-product-error" role="alert">{error}</p>}
+        <div className="add-product-actions">
+          <button className="add-product-submit" type="submit" disabled={loading}>{loading ? "Creating..." : "Create product"}</button>
+          <button className="add-product-cancel" type="button" onClick={() => setOpen(false)}>Cancel</button>
         </div>
       </form>
     </div>

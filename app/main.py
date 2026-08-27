@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -22,7 +23,7 @@ app = FastAPI(title="Merchant Agent Gateway")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -49,9 +50,9 @@ class PayRequest(BaseModel):
 
 
 class ProductCreate(BaseModel):
-    name: str
-    category: str
-    price_paise: int
+    name: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    price_paise: int = Field(gt=0)
     stock_qty: int = Field(ge=0)
     attributes: dict = Field(default_factory=dict)
 
@@ -455,5 +456,8 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)) -> d
     signature = request.headers.get("X-Razorpay-Signature")
     if not verify_webhook_signature(payload, signature):
         raise HTTPException(status_code=400, detail="invalid webhook signature")
-    process_webhook(db, payload)
+    try:
+        process_webhook(db, payload)
+    except (json.JSONDecodeError, ValueError) as error:
+        raise HTTPException(status_code=400, detail="invalid webhook payload") from error
     return {"status": "ok"}

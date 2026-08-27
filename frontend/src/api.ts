@@ -75,6 +75,16 @@ export type AuditEntry = {
 
 export type Audit = { order_id: string; items: AuditEntry[]; count: number };
 
+export type LedgerItem = {
+  id: number;
+  order_id: string | null;
+  step: string;
+  timestamp: string;
+  details: Record<string, unknown>;
+};
+
+export type Ledger = { items: LedgerItem[]; count: number };
+
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000",
   headers: { "Content-Type": "application/json" }
@@ -91,6 +101,8 @@ export const payOrder = async (order_id: string): Promise<Order | Approval> =>
   (await client.post<Order | Approval>(`/v1/orders/${order_id}/pay`, { mode: "link" })).data;
 export const getAudit = async (order_id: string): Promise<Audit> =>
   (await client.get<Audit>(`/v1/orders/${order_id}/audit`)).data;
+export const getLedger = async (limit = 25): Promise<Ledger> =>
+  (await client.get<Ledger>("/v1/ledger", { params: { limit } })).data;
 export const getPendingApprovals = async (): Promise<PendingApprovals> =>
   (await client.get<PendingApprovals>("/v1/approvals")).data;
 export const approveRequest = async (approval_id: string): Promise<Approval> =>
