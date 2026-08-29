@@ -49,10 +49,24 @@ export type Order = {
   order_id: string;
   amount_paise: number;
   currency: "INR";
-  settlement_methods: string[];
+  settlement_methods?: string[];
   razorpay_order_id?: string;
+  razorpay_payment_link_url?: string;
   payment_link_url?: string;
   status?: string;
+  payment_id?: string;
+  payment_status?: string;
+  payment_method?: string;
+  payment_amount_paise?: number;
+  payment_currency?: string;
+  payment_timestamp?: string;
+  webhook_event_id?: string;
+  webhook_event_type?: string;
+  webhook_received_at?: string;
+  webhook_verified?: boolean;
+  webhook_processing_status?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type Approval = { approval_id: string; status?: string };
@@ -97,6 +111,8 @@ export const getUpsell = async (quote_id: string): Promise<Upsell> =>
   (await client.post<Upsell>(`/v1/quote/${quote_id}/upsell`)).data;
 export const initiateCheckout = async (quote_id: string, nonce: string): Promise<Order> =>
   (await client.post<Order>("/v1/checkout", { quote_id, nonce }, { validateStatus: (status) => status === 402 })).data;
+export const getOrder = async (order_id: string): Promise<Order> =>
+  (await client.get<Order>(`/v1/orders/${order_id}`)).data;
 export const payOrder = async (order_id: string): Promise<Order | Approval> =>
   (await client.post<Order | Approval>(`/v1/orders/${order_id}/pay`, { mode: "link" })).data;
 export const getAudit = async (order_id: string): Promise<Audit> =>

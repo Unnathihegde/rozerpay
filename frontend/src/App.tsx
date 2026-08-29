@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Bell, Bot, Check, ChevronDown, CircleDollarSign, Clock3, CreditCard, FileText, Heart, Hexagon, KeyRound, LockKeyhole, Menu, Search, ShieldCheck, ShoppingBag, Sparkles, Star, X, Zap } from "lucide-react";
-import { approveRequest, createQuote, getCatalog, getLedger, getPendingApprovals, getUpsell, initiateCheckout, payOrder, rejectRequest, type LedgerItem, type Order, type Quote, type Upsell, type PendingApproval } from "./api";
+import { approveRequest, createQuote, getCatalog, getLedger, getOrder, getPendingApprovals, getUpsell, initiateCheckout, payOrder, rejectRequest, type LedgerItem, type Order, type Quote, type Upsell, type PendingApproval } from "./api";
 import AddProduct from "./AddProduct";
 
 type Product = { id: string; name: string; category: string; price: number; image: string | null; description: string; delivery: string; compatibility: string; rating: string; availability: "In stock" | "Out of stock" | "Unknown" };
@@ -133,7 +133,45 @@ export default function App() {
   const addToCart = (product: Product, quantity = 1) => setCart((items) => { const existing = items.find((item) => item.product.id === product.id); return existing ? items.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item) : [...items, { product, quantity }]; });
   const requestQuote = async (product: Product) => { setQuoteBusy(true); setQuoteError(null); try { const result = await createQuote(product.id, 1); setQuote(result); setSelected(product); setUpsell(await getUpsell(result.quote_id)); } catch (error) { setQuoteError("The quote could not be created. Check stock and try again."); throw error; } finally { setQuoteBusy(false); } };
   const startCheckout = async () => { if (!quote) return; setCheckout(true); setCheckoutError(null); try { const result = await initiateCheckout(quote.quote_id, crypto.randomUUID()); setOrder(result); setPayment("pending"); } catch { setOrder(null); setCheckoutError("The order could not be created. Check the quote and try again."); } };
-  const createPayment = async () => { if (!order) return; setPayment("pending"); try { const result = await payOrder(order.order_id); if ("approval_id" in result) setPayment("approval"); else { setOrder({ ...order, ...result }); setPayment("ready"); } } catch { setPayment("failed"); } };
+  const refreshOrderState = async (orderId = order?.order_id) => {
+    if (!orderId) return null;
+    try {
+      const result = await getOrder(orderId);
+      setOrder((current) => ({ ...(current ?? {}), ...result }));
+      const status = (result.status ?? "").toLowerCase();
+      if (status === "paid") setPayment("ready");
+      else if (status === "failed" || status === "recovered_pending_retry") setPayment("failed");
+      else if (status === "awaiting_payment") setPayment("pending");
+      return result;
+    } catch {
+      return null;
+    }
+  };
+  const createPayment = async () => { if (!order) return; setPayment("pending"); try { const result = await payOrder(order.order_id); if ("approval_id" in result) { setPayment("approval"); return; } const nextOrder = { ...order, ...result, payment_link_url: result.payment_link_url ?? result.razorpay_payment_link_url ?? order.payment_link_url, status: result.status ?? order.status }; setOrder(nextOrder); if (nextOrder.payment_link_url) window.open(nextOrder.payment_link_url, "_blank", "noopener,noreferrer"); setPayment("pending"); void refreshOrderState(order.order_id); } catch { setPayment("failed"); } };
+
+  useEffect(() => {
+    if (!checkout || !order?.order_id) return;
+    const terminalStates = new Set(["paid", "failed", "recovered_pending_retry"]);
+    const status = (order.status ?? "").toLowerCase();
+    if (terminalStates.has(status)) return;
+
+    let timeoutId: number | undefined;
+    let active = true;
+
+    const poll = async () => {
+      const fresh = await refreshOrderState(order.order_id);
+      if (!active || !fresh) return;
+      const freshStatus = (fresh.status ?? "").toLowerCase();
+      if (terminalStates.has(freshStatus)) return;
+      timeoutId = window.setTimeout(poll, 3000);
+    };
+
+    void poll();
+    return () => {
+      active = false;
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [checkout, order?.order_id, order?.status]);
 
   if (view === "gateway") return <GatewayDashboard products={products} connection={connection} onBack={() => setView("store")} />;
 

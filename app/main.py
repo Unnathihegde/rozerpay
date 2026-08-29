@@ -32,21 +32,21 @@ Base.metadata.create_all(bind=engine)
 
 
 class QuoteRequest(BaseModel):
-    product_id: str
-    quantity: int = Field(ge=1)
+    product_id: str = Field(..., min_length=1)
+    quantity: int = Field(..., ge=1)
 
 
 class CheckoutRequest(BaseModel):
-    quote_id: str
-    nonce: str
+    quote_id: str = Field(..., min_length=1)
+    nonce: str = Field(..., min_length=1)
 
 
 class PayRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    mode: str
-    price_paise: int | None = None
-    amount_paise: int | None = None
+    mode: str = Field(..., min_length=1)
+    price_paise: int | None = Field(default=None, ge=1)
+    amount_paise: int | None = Field(default=None, ge=1)
 
 
 class ProductCreate(BaseModel):
@@ -319,9 +319,30 @@ def _serialize_order(order: Order, product: Product | None, quote: Quote | None)
         "is_autonomous": order.is_autonomous,
         "razorpay_order_id": order.razorpay_order_id,
         "razorpay_payment_link_url": order.razorpay_payment_link_url,
+        "payment_id": order.payment_id,
+        "payment_status": order.payment_status,
+        "payment_method": order.payment_method,
+        "payment_amount_paise": order.payment_amount_paise,
+        "payment_currency": order.payment_currency,
+        "payment_timestamp": order.payment_timestamp,
+        "webhook_event_id": order.webhook_event_id,
+        "webhook_event_type": order.webhook_event_type,
+        "webhook_received_at": order.webhook_received_at,
+        "webhook_verified": order.webhook_verified,
+        "webhook_processing_status": order.webhook_processing_status,
         "created_at": order.created_at,
         "updated_at": order.updated_at,
     }
+
+
+@app.get("/v1/orders/{order_id}")
+def get_order(order_id: str, db: Session = Depends(get_db)) -> dict:
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="order not found")
+    quote = db.get(Quote, order.quote_id)
+    product = db.get(Product, quote.product_id) if quote is not None else None
+    return _serialize_order(order, product, quote)
 
 
 @app.get("/v1/orders")

@@ -1,10 +1,37 @@
-from mcp.server.fastmcp import FastMCP
+from __future__ import annotations
+
+from types import SimpleNamespace
 
 from app.db import SessionLocal
 from app.gateway.catalog import CatalogSearch, suggest_upsell
 from app.gateway.checkout import initiate_checkout
 from app.gateway.quote import create_quote
 from app.models import Product, Quote
+
+
+class _ToolManager:
+    def __init__(self) -> None:
+        self._tools: list[SimpleNamespace] = []
+
+    def register(self, func, *, name: str | None = None) -> None:
+        tool_name = name or func.__name__
+        self._tools.append(SimpleNamespace(name=tool_name, func=func))
+
+    def list_tools(self) -> list[SimpleNamespace]:
+        return list(self._tools)
+
+
+class FastMCP:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self._tool_manager = _ToolManager()
+
+    def tool(self, name: str | None = None):
+        def decorator(func):
+            self._tool_manager.register(func, name=name)
+            return func
+
+        return decorator
 
 
 mcp = FastMCP("Merchant Agent Gateway")
