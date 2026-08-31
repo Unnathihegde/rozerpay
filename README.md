@@ -1,6 +1,6 @@
 # Merchant Agent Gateway
 
-A hackathon-ready gateway that lets an AI buyer agent discover a merchant, obtain a locked quote, negotiate checkout, and complete payment through Razorpay Test Mode. The AI proposes actions; deterministic policy and execution layers authorize and execute them.
+A gateway that lets an AI buyer agent discover a merchant, obtain a locked quote, negotiate checkout, and complete payment through Razorpay Test Mode. The AI proposes actions; deterministic policy and execution layers authorize and execute them.
 
 ## Setup
 
