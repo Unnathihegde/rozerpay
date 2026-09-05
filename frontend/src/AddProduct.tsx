@@ -8,6 +8,7 @@ export default function AddProduct() {
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState(0); // rupees
   const [stock, setStock] = useState(1);
+  const [imageUrl, setImageUrl] = useState("");
   const [attributes, setAttributes] = useState("{}");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export default function AddProduct() {
         category,
         price_paise: Math.round(price * 100),
         stock_qty: stock,
+        image_url: imageUrl.trim() || undefined,
         attributes: parsedAttrs,
       };
       await createProduct(payload);
@@ -59,6 +61,7 @@ export default function AddProduct() {
           <label>Category<input placeholder="e.g. accessory" value={category} onChange={(e) => setCategory(e.target.value)} required /></label>
           <label>Price (INR)<input type="number" min="0.01" step="0.01" placeholder="0.00" value={price || ""} onChange={(e) => setPrice(Number(e.target.value))} required /></label>
           <label>Stock quantity<input type="number" min="0" step="1" placeholder="0" value={stock} onChange={(e) => setStock(Number(e.target.value))} required /></label>
+          <label>Image URL<input type="url" placeholder="https://example.com/product.jpg" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} /></label>
         </div>
         <label className="add-product-attributes">Attributes <span>Optional JSON metadata</span><textarea rows={4} placeholder='{"compatibility":"USB-C"}' value={attributes} onChange={(e) => setAttributes(e.target.value)} /></label>
         {error && <p className="add-product-error" role="alert">{error}</p>}

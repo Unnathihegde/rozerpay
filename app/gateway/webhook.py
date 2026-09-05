@@ -138,7 +138,7 @@ def process_webhook(db: Session, payload: bytes) -> dict:
             {
                 "amount": order.amount_paise,
                 "currency": "INR",
-                "reference_id": f"{order.id}-retry-{uuid.uuid4().hex[:8]}",
+                "reference_id": f"retry-{uuid.uuid4().hex[:16]}",
                 "description": f"Payment retry for order {order.id}",
                 "notify": {"sms": False, "email": False},
             }

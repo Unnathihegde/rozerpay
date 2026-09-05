@@ -14,6 +14,7 @@ class Product(Base):
     category: Mapped[str] = mapped_column(String, nullable=False, index=True)
     price_paise: Mapped[int] = mapped_column(Integer, nullable=False)
     stock_qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     attributes_json: Mapped[str] = mapped_column(Text, nullable=False)
     embedding_json: Mapped[str] = mapped_column(Text, nullable=False)
 

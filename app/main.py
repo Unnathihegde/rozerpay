@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db import Base, engine, get_db
+from app.db import Base, engine, ensure_schema_compatibility, get_db
 from app.gateway.catalog import suggest_upsell
 from app.gateway.checkout import create_payment_link, initiate_checkout
 from app.gateway.policy import check_for_anomalies, require_approval_if_needed, resolve_approval
@@ -29,6 +29,7 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+ensure_schema_compatibility()
 
 
 class QuoteRequest(BaseModel):
@@ -54,6 +55,7 @@ class ProductCreate(BaseModel):
     category: str = Field(min_length=1)
     price_paise: int = Field(gt=0)
     stock_qty: int = Field(ge=0)
+    image_url: str | None = Field(default=None, min_length=1)
     attributes: dict = Field(default_factory=dict)
 
 
@@ -74,6 +76,7 @@ def create_product(request: ProductCreate, db: Session = Depends(get_db)) -> dic
         category=request.category,
         price_paise=request.price_paise,
         stock_qty=request.stock_qty,
+        image_url=request.image_url,
         attributes_json=_json.dumps(request.attributes),
         embedding_json=_json.dumps(rng.random(8).tolist()),
     )
@@ -86,6 +89,7 @@ def create_product(request: ProductCreate, db: Session = Depends(get_db)) -> dic
         "category": product.category,
         "price_paise": product.price_paise,
         "stock_qty": product.stock_qty,
+        "image_url": product.image_url,
     }
 
 
@@ -102,6 +106,7 @@ def catalog_jsonld(db: Session = Depends(get_db)) -> JSONResponse:
                 "@id": product.id,
                 "name": product.name,
                 "category": product.category,
+                "image": product.image_url,
                 "offers": {
                     "@type": "Offer",
                     "priceCurrency": "INR",

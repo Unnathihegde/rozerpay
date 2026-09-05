@@ -15,6 +15,7 @@ export type CatalogProduct = {
   "@id": string;
   name: string;
   category: string;
+  image?: string | null;
   offers: {
     "@type": "Offer";
     priceCurrency: "INR";
@@ -101,7 +102,10 @@ export type Ledger = { items: LedgerItem[]; count: number };
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000",
-  headers: { "Content-Type": "application/json" }
+  headers: {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true"
+  }
 });
 
 export const getCatalog = async (): Promise<Catalog> => (await client.get<Catalog>("/catalog.jsonld")).data;
@@ -126,5 +130,5 @@ export const approveRequest = async (approval_id: string): Promise<Approval> =>
 export const rejectRequest = async (approval_id: string): Promise<Approval> =>
   (await client.post<Approval>(`/v1/approvals/${approval_id}/reject`)).data;
 
-export const createProduct = async (payload: { name: string; category: string; price_paise: number; stock_qty: number; attributes?: Record<string, unknown> }): Promise<CreatedProduct> =>
+export const createProduct = async (payload: { name: string; category: string; price_paise: number; stock_qty: number; image_url?: string; attributes?: Record<string, unknown> }): Promise<CreatedProduct> =>
   (await client.post<CreatedProduct>("/v1/products", payload)).data;
