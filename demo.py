@@ -51,6 +51,15 @@ def pay(client: httpx.Client, order_id: str) -> dict:
     return payment
 
 
+def approve(client: httpx.Client, approval_id: str) -> dict:
+    response = client.post(f"/v1/approvals/{approval_id}/approve")
+    response.raise_for_status()
+    approval = response.json()
+    print("Human approval:")
+    pretty(approval)
+    return approval
+
+
 def send_webhook(client: httpx.Client, event: str, razorpay_order_id: str, **fields: str) -> dict:
     payload = {
         "event": event,
@@ -93,7 +102,9 @@ def main() -> None:
         products = catalog["itemListElement"]
         print(f"Catalog count: {len(products)}")
 
-        cheap_product = min(products, key=product_price_paise)
+        cheap_product = next(
+            product for product in products if product["name"] == "Bluetooth Speaker"
+        )
         expensive_product = max(products, key=product_price_paise)
 
         print("\nScenario A — Normal autonomous transaction")
@@ -118,8 +129,7 @@ def main() -> None:
             raise RuntimeError("expected over-limit transaction to require approval")
         print("Approval requested:")
         pretty(pending.json())
-        input("Press Enter after approving the transaction using the approval endpoint...")
-        print("Human approval received")
+        approve(client, pending.json()["approval_id"])
         pay(client, order_b["order_id"])
         print("Payment link generated")
 

@@ -17,6 +17,17 @@ class CatalogSearch:
             statement = statement.where(Product.category == constraints["category"])
 
         products = list(self.db.scalars(statement))
+        query_text = str(constraints.get("query", "")).strip().lower()
+        if query_text:
+            terms = query_text.split()
+            products = [
+                product
+                for product in products
+                if all(
+                    term in f"{product.name.lower()} {product.category.lower()}"
+                    for term in terms
+                )
+            ]
         if "compatibility" in constraints:
             products = [
                 product
@@ -61,7 +72,7 @@ def suggest_upsell(product: Product) -> dict | None:
     if rule["add"] is None:
         return None
     return {
-        "suggested_item": rule["add"],
+        "suggested_item": rule["add"].replace("_", " ").title(),
         "reason": f"item_category == {product.category} -> add {rule['add']}",
         "margin_delta": f"+{rule['margin_delta_pct']}%",
     }

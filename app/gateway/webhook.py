@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
@@ -137,7 +138,7 @@ def process_webhook(db: Session, payload: bytes) -> dict:
             {
                 "amount": order.amount_paise,
                 "currency": "INR",
-                "reference_id": order.id,
+                "reference_id": f"{order.id}-retry-{uuid.uuid4().hex[:8]}",
                 "description": f"Payment retry for order {order.id}",
                 "notify": {"sms": False, "email": False},
             }

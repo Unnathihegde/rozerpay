@@ -8,21 +8,14 @@ from app.models.product import Product
 
 
 CATALOG = [
-    ("Travel Camera", "camera", 4599900),
-    ("Compact Camera", "camera", 2999900),
-    ("Mirrorless Camera", "camera", 6999900),
-    ("Action Camera", "camera", 2499900),
-    ("Studio Camera", "camera", 8999900),
-    ("Wireless Headphones", "audio", 1599900),
-    ("Bluetooth Speaker", "audio", 899900),
-    ("Noise Cancelling Earbuds", "audio", 1199900),
-    ("Podcast Microphone", "audio", 749900),
-    ("Portable DAC", "audio", 999900),
-    ("USB-C Cable", "accessory", 99900),
-    ("Lightning Cable", "accessory", 129900),
-    ("Bluetooth Tracker", "accessory", 199900),
-    ("Camera Strap", "accessory", 149900),
-    ("Lens Cleaner Kit", "accessory", 79900),
+    ("Wireless Headphones", "audio", 1299900),
+    ("Mechanical Keyboard", "electronics", 749900),
+    ("Wireless Mouse", "electronics", 249900),
+    ("USB-C Hub", "electronics", 399900),
+    ("Laptop Stand", "accessory", 329900),
+    ("1080p Webcam", "electronics", 599900),
+    ("Bluetooth Speaker", "audio", 499900),
+    ("Carrying Case", "accessory", 149900),
 ]
 COMPATIBILITY = ["USB-C", "Lightning", "Bluetooth", "N/A"]
 

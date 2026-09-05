@@ -154,6 +154,21 @@ Catalog search is implemented behind the `CatalogSearch` interface.
 
 The current implementation uses local **NumPy cosine similarity**, while the interface allows the search layer to be replaced later with a vector database without changing the agent-facing API.
 
+The seed catalog contains these eight demo products:
+
+| Product | Category | Price |
+| --- | --- | ---: |
+| Wireless Headphones | audio | ₹12,999.00 |
+| Mechanical Keyboard | electronics | ₹7,499.00 |
+| Wireless Mouse | electronics | ₹2,499.00 |
+| USB-C Hub | electronics | ₹3,999.00 |
+| Laptop Stand | accessory | ₹3,299.00 |
+| 1080p Webcam | electronics | ₹5,999.00 |
+| Bluetooth Speaker | audio | ₹4,999.00 |
+| Carrying Case | accessory | ₹1,499.00 |
+
+Run `python seed.py` before a demo. MCP catalog searches accept structured constraints such as `{"query": "wireless headphones"}`, `{"query": "keyboard"}`, `{"query": "mouse"}`, or `{"query": "electronics"}`.
+
 ---
 
 ### Quote System
@@ -493,6 +508,8 @@ On Windows, create `.env` manually if required.
 
 Add your **Razorpay Test Mode** credentials to `.env`.
 
+The required variables are `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. Keep `APP_ENV=local` for this demo and set a non-placeholder `QUOTE_SIGNING_SECRET` for signed quotes.
+
 Never commit real credentials to GitHub.
 
 ---
@@ -603,7 +620,7 @@ Send a locally signed `payment.captured` webhook and show the resulting audit tr
 
 **6. Demonstrate human approval**
 
-Create an order above the spending limit and show it entering `awaiting_approval`. Approve it using the approval endpoint.
+Create an order above the spending limit and show it entering `awaiting_approval`. The `demo.py` script then calls the approval endpoint explicitly before creating its payment link.
 
 **7. Demonstrate failure recovery**
 
